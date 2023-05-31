@@ -1,0 +1,137 @@
+
+
+Sub Макрос1()
+'Макрос подтягивает данные в лист, на котором сформировано подобиие дашборта, который привязан к таблицам в презентации, для отражения данных в отчёте. 
+'Т.е. данные подаются из таблиц, но вместо ручного ввода мы автоматизируем подтягивание данных и закрепляем формулы. Т.к. суть деятельности была в формировании отчётов, которые состояли из 10 разных таблиц, с разными данными. Коллеги занимались ручным вводом, т.е: 
+'Прописать\скопировать формулу - протянуть и т.п. я автоматизировал это и мне оставалось только скачать файлы с таблицами и нажать кнопку. То, на что у коллег уходило по часу и более - мною решалось за минуту. Чуть больше времени уходило на проверку от ошибок, которых
+не было, по этому лишних проверок не установил. Опыт автоматизации первый, премий не давали, так что пофиг. Зато научился. Ниже пример кода, т.к. в сущности, он повторяется множество раз. Да, можно было упростить через циклы, но стоило ли оно того? ))
+' Макрос1 Макрос
+'
+
+'   Dim s As String
+'задаём изменяемую переменную с датой, т.к. файлы имеют один и тот же формат названия, меняется только дата
+    s = Range("B1").Value
+'далее, задав формулы на листах, через запись макроса прописываем код, затем меняем необходимые куски на нашу переменную
+     Sheets("название листа").Select
+    Range("R21").Select
+    ActiveCell.FormulaR1C1 = _
+        "='адрес и название листа " & s & ".xlsx]'!R5C2"
+    Range("R22").Select
+    ActiveCell.FormulaR1C1 = _
+        "='адрес и название листа " & s & ".xlsx].'!R5C6"
+    Range("S21").Select
+    ActiveCell.FormulaR1C1 = _
+        "='адрес и название листа " & s & ".xlsx].'!R22C2"
+    Range("S22").Select
+    ActiveCell.FormulaR1C1 = _
+        "='адрес и название листа " & s & ".xlsx].'!R22C6"
+    Range("T21").Select
+    ActiveCell.FormulaR1C1 = _
+        "='адрес и название листа " & s & ".xlsx].'!R44C2"
+    Range("T22").Select
+    ActiveCell.FormulaR1C1 = _
+        "='адрес и название листа " & s & ".xlsx].'!R44C6"
+    Range("U21").Select
+    ActiveCell.FormulaR1C1 = _
+        "='адрес и название листа " & s & ".xlsx].'!R69C2"
+    Range("U22").Select
+    ActiveCell.FormulaR1C1 = _
+        "='адрес и название листа " & s & ".xlsx].'!R69C6"
+    Range("W21").Select
+    ActiveCell.FormulaR1C1 = _
+        "='адрес и название листа " & s & ".xlsx].'!R73C2"
+    Range("W22").Select
+    ActiveCell.FormulaR1C1 = _
+        "='адрес и название листа " & s & ".xlsx].'!R73C6"
+    Range("X23").Select
+    Sheets("адрес и название листа").Select
+    Range("R21").Select
+    ActiveCell.FormulaR1C1 = _
+        "='адрес и название листа " & s & ".xlsx].'!R75C2"
+    Range("R22").Select
+    ActiveCell.FormulaR1C1 = _
+        "='адрес и название листа " & s & ".xlsx].'!R75C6"
+    Range("S21").Select
+    ActiveCell.FormulaR1C1 = _
+        "='адрес и название листа " & s & ".xlsx].'!R141C2"
+    Range("S22").Select
+    ActiveCell.FormulaR1C1 = _
+        "='адрес и название листа " & s & ".xlsx].'!R141C6"
+    Range("T21").Select
+    ActiveCell.FormulaR1C1 = _
+        "='адрес и название листа " & s & ".xlsx].'!R164C2"
+    Range("T22").Select
+    ActiveCell.FormulaR1C1 = _
+        "='адрес и название листа " & s & ".xlsx].'!R164C6"
+    Range("W21").Select
+    ActiveCell.FormulaR1C1 = _
+        "='адрес и название листа " & s & ".xlsx].'!R302C2"
+    Range("W22").Select
+    ActiveCell.FormulaR1C1 = _
+        "='адрес и название листа " & s & ".xlsx].'!R302C6"
+    Range("S27").Select
+    Sheets("название листа2").Select
+    ActiveWindow.SmallScroll Down:=-18
+    Range("C4").Select
+    ActiveCell.FormulaR1C1 = _
+        "=IFERROR(VLOOKUP(RC[-1],'адрес и название листа2 " & s & ".xlsx].'!R5C1:R69C2,2,0),0)"
+    Range("C4").Select
+    Selection.AutoFill Destination:=Range("C4:C15"), Type:=xlFillDefault
+    Range("C4:C15").Select
+    Range("D4").Select
+    ActiveCell.FormulaR1C1 = _
+        "=IFERROR(VLOOKUP(RC[-2],'адрес и название листа2 " & s & ".xlsx].'!R5C1:R69C6,6,0),0)"
+    Range("D4").Select
+    Selection.AutoFill Destination:=Range("D4:D15"), Type:=xlFillDefault
+    Range("D4:D15").Select
+    ActiveWindow.SmallScroll Down:=6
+    Range("C16").Select
+    ActiveCell.FormulaR1C1 = _
+        "=IFERROR(VLOOKUP(RC[6],'адрес и название листа2 " & s & ".xlsx].'!R5C1:R69C2,2,0),0)"
+    Range("C17").Select
+    ActiveCell.FormulaR1C1 = _
+        "=IFERROR(VLOOKUP(RC[6],'адрес и название листа2 " & s & ".xlsx].'!R5C1:R69C2,2,0),0)"
+    Range("C18").Select
+    ActiveCell.FormulaR1C1 = _
+        "=IFERROR(VLOOKUP(RC[6],'адрес и название листа2 " & s & ".xlsx].'!R5C1:R69C2,2,0),0)"
+    Range("C19").Select
+    ActiveWindow.SmallScroll Down:=-6
+    Range("D15").Select
+    ActiveWindow.SmallScroll Down:=3
+    Range("D16").Select
+    ActiveCell.FormulaR1C1 = _
+        "=IFERROR(VLOOKUP(RC[5],'адрес и название листа2 " & s & ".xlsx].'!R5C1:R69C6,6,0),0)"
+    Range("D17").Select
+    ActiveCell.FormulaR1C1 = _
+        "=IFERROR(VLOOKUP(RC[5],'адрес и название листа2 " & s & ".xlsx].'!R5C1:R69C6,6,0),0)"
+    Range("D18").Select
+    ActiveCell.FormulaR1C1 = _
+        "=IFERROR(VLOOKUP(RC[5],'адрес и название листа2 " & s & ".xlsx].'!R5C1:R69C6,6,0),0)"
+    Range("D19").Select
+    ActiveWindow.SmallScroll Down:=12
+    Sheets("ещё лист").Select
+    Range("C5").Select
+    ActiveCell.FormulaR1C1 = _
+        "=IFERROR(VLOOKUP(RC[-1],'адрес и название листа2 " & s & ".xlsx].'!R75C1:R300C2,2,0),0)"
+    Range("C6").Select
+    ActiveWindow.SmallScroll Down:=3
+    Range("C5").Select
+    Selection.AutoFill Destination:=Range("C5:C20"), Type:=xlFillDefault
+    Range("C5:C20").Select
+    Range("D5").Select
+    ActiveCell.FormulaR1C1 = _
+        "=IFERROR(VLOOKUP(RC[-2],'адрес и название листа2 " & s & ".xlsx].'!R75C1:R300C6,6,0),0)"
+    Range("D5").Select
+    Selection.AutoFill Destination:=Range("D5:D20"), Type:=xlFillDefault
+    Range("D5:D20").Select
+    Range("C21").Select
+    ActiveCell.FormulaR1C1 = _
+        "=('адрес и название листа2 " & s & ".xlsx].'!R302C2)-(SUM(R[-16]C:R[-1]C))"
+    Range("D21").Select
+    ActiveCell.FormulaR1C1 = _
+        "=('адрес и название листа2 " & s & ".xlsx].'!R302C6)-(SUM(R[-16]C:R[-1]C))"
+    Range("D22").Select
+    ActiveWindow.SmallScroll Down:=-9
+    Worksheets("Гистограммы").Activate
+    Worksheets("Гистограммы").Range("B1").Activate
+End Sub
