@@ -1,0 +1,468 @@
+Option Explicit
+
+'===============================================================================
+' НАСТРОЙКИ
+' Замените значения констант на реальные названия листов, файлов и каталогов.
+'===============================================================================
+
+Private Const DATE_SHEET As String = "Параметры"
+Private Const DATE_CELL As String = "B1"
+
+' Формат даты должен совпадать с форматом даты в имени исходного файла.
+' Примеры:
+'   dd.mm.yyyy  -> 19.07.2026
+'   yyyy-mm-dd  -> 2026-07-19
+Private Const DATE_FILE_FORMAT As String = "dd.mm.yyyy"
+
+Private Const SOURCE_FOLDER As String = "C:\Путь\к\исходным файлам"
+
+' Первый исходный файл:
+' <префикс><дата>.xlsx
+Private Const SOURCE_FILE_1_PREFIX As String = "Название первого файла "
+Private Const SOURCE_FILE_1_SHEET As String = "Лист1"
+
+' Второй исходный файл:
+' <префикс><дата>.xlsx
+Private Const SOURCE_FILE_2_PREFIX As String = "Название второго файла "
+Private Const SOURCE_FILE_2_SHEET As String = "Лист1"
+
+' Листы текущей отчётной книги.
+Private Const DESTINATION_SHEET_1 As String = "Название листа"
+Private Const DESTINATION_SHEET_2 As String = "Адрес и название листа"
+Private Const LOOKUP_SHEET_1 As String = "Название листа2"
+Private Const LOOKUP_SHEET_2 As String = "Ещё лист"
+Private Const CHARTS_SHEET As String = "Гистограммы"
+
+' Проверять ли наличие исходных файлов до записи формул.
+Private Const CHECK_SOURCE_FILES As Boolean = True
+
+
+'===============================================================================
+' ОСНОВНАЯ ПРОЦЕДУРА
+'===============================================================================
+
+Public Sub UpdateReport()
+
+    Const PROCEDURE_NAME As String = "UpdateReport"
+
+    Dim reportWorkbook As Workbook
+
+    Dim dateToken As String
+    Dim sourceFolder As String
+    Dim sourceFile1 As String
+    Dim sourceFile2 As String
+
+    Dim sourceReference1 As String
+    Dim sourceReference2 As String
+
+    Dim previousCalculation As XlCalculation
+    Dim previousScreenUpdating As Boolean
+    Dim previousEnableEvents As Boolean
+    Dim previousDisplayStatusBar As Boolean
+    Dim previousStatusBar As Variant
+
+    Dim errorMessage As String
+
+    On Error GoTo ErrorHandler
+
+    Set reportWorkbook = ThisWorkbook
+
+    ' Сохраняем текущие настройки Excel.
+    previousCalculation = Application.Calculation
+    previousScreenUpdating = Application.ScreenUpdating
+    previousEnableEvents = Application.EnableEvents
+    previousDisplayStatusBar = Application.DisplayStatusBar
+    previousStatusBar = Application.StatusBar
+
+    ' Временно отключаем лишние операции интерфейса.
+    With Application
+        .ScreenUpdating = False
+        .EnableEvents = False
+        .Calculation = xlCalculationManual
+        .DisplayStatusBar = True
+        .StatusBar = "Обновление отчётных данных..."
+    End With
+
+    ' --------------------------------------------------------------------------
+    ' 1. Получаем дату, используемую в названиях исходных файлов.
+    ' --------------------------------------------------------------------------
+
+    dateToken = GetDateToken( _
+        GetWorksheet(reportWorkbook, DATE_SHEET).Range(DATE_CELL) _
+    )
+
+    If Len(dateToken) = 0 Then
+        Err.Raise _
+            Number:=vbObjectError + 1000, _
+            Source:=PROCEDURE_NAME, _
+            Description:="В ячейке " & DATE_SHEET & "!" & DATE_CELL & _
+                         " не указана дата отчёта."
+    End If
+
+    sourceFolder = AddTrailingSeparator(SOURCE_FOLDER)
+
+    sourceFile1 = SOURCE_FILE_1_PREFIX & dateToken & ".xlsx"
+    sourceFile2 = SOURCE_FILE_2_PREFIX & dateToken & ".xlsx"
+
+    ' --------------------------------------------------------------------------
+    ' 2. Проверяем наличие исходных файлов.
+    ' --------------------------------------------------------------------------
+
+    If CHECK_SOURCE_FILES Then
+        ValidateFileExists sourceFolder & sourceFile1
+        ValidateFileExists sourceFolder & sourceFile2
+    End If
+
+    ' Формируем ссылки вида:
+    ' 'C:\Reports\[Файл 19.07.2026.xlsx]Лист1'!
+    sourceReference1 = BuildExternalReference( _
+        sourceFolder, _
+        sourceFile1, _
+        SOURCE_FILE_1_SHEET _
+    )
+
+    sourceReference2 = BuildExternalReference( _
+        sourceFolder, _
+        sourceFile2, _
+        SOURCE_FILE_2_SHEET _
+    )
+
+    ' --------------------------------------------------------------------------
+    ' 3. Заполняем первую сводную таблицу.
+    ' --------------------------------------------------------------------------
+
+    Application.StatusBar = "Обновление первой сводной таблицы..."
+
+    ApplyExternalLinks _
+        targetSheet:=GetWorksheet(reportWorkbook, DESTINATION_SHEET_1), _
+        externalReference:=sourceReference1, _
+        linkMap:=Array( _
+            Array("R21", "R5C2"), _
+            Array("R22", "R5C6"), _
+            Array("S21", "R22C2"), _
+            Array("S22", "R22C6"), _
+            Array("T21", "R44C2"), _
+            Array("T22", "R44C6"), _
+            Array("U21", "R69C2"), _
+            Array("U22", "R69C6"), _
+            Array("W21", "R73C2"), _
+            Array("W22", "R73C6") _
+        )
+
+    ' --------------------------------------------------------------------------
+    ' 4. Заполняем вторую сводную таблицу.
+    ' --------------------------------------------------------------------------
+
+    Application.StatusBar = "Обновление второй сводной таблицы..."
+
+    ApplyExternalLinks _
+        targetSheet:=GetWorksheet(reportWorkbook, DESTINATION_SHEET_2), _
+        externalReference:=sourceReference1, _
+        linkMap:=Array( _
+            Array("R21", "R75C2"), _
+            Array("R22", "R75C6"), _
+            Array("S21", "R141C2"), _
+            Array("S22", "R141C6"), _
+            Array("T21", "R164C2"), _
+            Array("T22", "R164C6"), _
+            Array("W21", "R302C2"), _
+            Array("W22", "R302C6") _
+        )
+
+    ' --------------------------------------------------------------------------
+    ' 5. Заполняем таблицу с поиском данных по ключу.
+    ' --------------------------------------------------------------------------
+
+    Application.StatusBar = "Обновление таблицы детализации..."
+
+    UpdateFirstLookupSheet _
+        targetSheet:=GetWorksheet(reportWorkbook, LOOKUP_SHEET_1), _
+        externalReference:=sourceReference2
+
+    ' --------------------------------------------------------------------------
+    ' 6. Заполняем вторую таблицу с поиском данных и остатком.
+    ' --------------------------------------------------------------------------
+
+    Application.StatusBar = "Обновление итоговой таблицы..."
+
+    UpdateSecondLookupSheet _
+        targetSheet:=GetWorksheet(reportWorkbook, LOOKUP_SHEET_2), _
+        externalReference:=sourceReference2
+
+    ' --------------------------------------------------------------------------
+    ' 7. Пересчитываем отчёт.
+    ' --------------------------------------------------------------------------
+
+    Application.StatusBar = "Пересчёт отчёта..."
+
+    reportWorkbook.Calculate
+
+    ' Исходный макрос завершался переходом на лист с диаграммами.
+    Application.Goto _
+        Reference:=GetWorksheet(reportWorkbook, CHARTS_SHEET).Range("B1"), _
+        Scroll:=True
+
+CleanExit:
+
+    ' Восстанавливаем настройки Excel даже после ошибки.
+    On Error Resume Next
+
+    With Application
+        .Calculation = previousCalculation
+        .EnableEvents = previousEnableEvents
+        .ScreenUpdating = previousScreenUpdating
+        .DisplayStatusBar = previousDisplayStatusBar
+        .StatusBar = previousStatusBar
+    End With
+
+    On Error GoTo 0
+
+    If Len(errorMessage) > 0 Then
+        MsgBox _
+            Prompt:=errorMessage, _
+            Buttons:=vbCritical + vbOKOnly, _
+            Title:="Ошибка обновления отчёта"
+    Else
+        MsgBox _
+            Prompt:="Отчёт успешно обновлён для даты " & dateToken & ".", _
+            Buttons:=vbInformation + vbOKOnly, _
+            Title:="Обновление завершено"
+    End If
+
+    Exit Sub
+
+ErrorHandler:
+
+    errorMessage = _
+        "Не удалось обновить отчёт." & vbCrLf & vbCrLf & _
+        "Процедура: " & PROCEDURE_NAME & vbCrLf & _
+        "Код ошибки: " & Err.Number & vbCrLf & _
+        "Описание: " & Err.Description
+
+    Resume CleanExit
+
+End Sub
+
+
+'===============================================================================
+' ЗАПОЛНЕНИЕ ТАБЛИЦ
+'===============================================================================
+
+Private Sub UpdateFirstLookupSheet( _
+    ByVal targetSheet As Worksheet, _
+    ByVal externalReference As String)
+
+    With targetSheet
+
+        ' Поиск по значениям в столбце B.
+        .Range("C4:C15").FormulaR1C1 = _
+            "=IFERROR(" & _
+                "VLOOKUP(" & _
+                    "RC[-1]," & _
+                    externalReference & "R5C1:R69C2," & _
+                    "2," & _
+                    "FALSE" & _
+                ")," & _
+                "0" & _
+            ")"
+
+        .Range("D4:D15").FormulaR1C1 = _
+            "=IFERROR(" & _
+                "VLOOKUP(" & _
+                    "RC[-2]," & _
+                    externalReference & "R5C1:R69C6," & _
+                    "6," & _
+                    "FALSE" & _
+                ")," & _
+                "0" & _
+            ")"
+
+        ' В строках 16–18 ключ находится в столбце I:
+        ' для C это смещение +6, для D — смещение +5.
+        .Range("C16:C18").FormulaR1C1 = _
+            "=IFERROR(" & _
+                "VLOOKUP(" & _
+                    "RC[6]," & _
+                    externalReference & "R5C1:R69C2," & _
+                    "2," & _
+                    "FALSE" & _
+                ")," & _
+                "0" & _
+            ")"
+
+        .Range("D16:D18").FormulaR1C1 = _
+            "=IFERROR(" & _
+                "VLOOKUP(" & _
+                    "RC[5]," & _
+                    externalReference & "R5C1:R69C6," & _
+                    "6," & _
+                    "FALSE" & _
+                ")," & _
+                "0" & _
+            ")"
+
+    End With
+
+End Sub
+
+
+Private Sub UpdateSecondLookupSheet( _
+    ByVal targetSheet As Worksheet, _
+    ByVal externalReference As String)
+
+    With targetSheet
+
+        ' Поиск по значениям в столбце B.
+        .Range("C5:C20").FormulaR1C1 = _
+            "=IFERROR(" & _
+                "VLOOKUP(" & _
+                    "RC[-1]," & _
+                    externalReference & "R75C1:R300C2," & _
+                    "2," & _
+                    "FALSE" & _
+                ")," & _
+                "0" & _
+            ")"
+
+        .Range("D5:D20").FormulaR1C1 = _
+            "=IFERROR(" & _
+                "VLOOKUP(" & _
+                    "RC[-2]," & _
+                    externalReference & "R75C1:R300C6," & _
+                    "6," & _
+                    "FALSE" & _
+                ")," & _
+                "0" & _
+            ")"
+
+        ' Остаток: общий показатель минус сумма уже распределённых значений.
+        .Range("C21").FormulaR1C1 = _
+            "=(" & externalReference & "R302C2)" & _
+            "-SUM(R[-16]C:R[-1]C)"
+
+        .Range("D21").FormulaR1C1 = _
+            "=(" & externalReference & "R302C6)" & _
+            "-SUM(R[-16]C:R[-1]C)"
+
+    End With
+
+End Sub
+
+
+'===============================================================================
+' ВСПОМОГАТЕЛЬНЫЕ ПРОЦЕДУРЫ
+'===============================================================================
+
+Private Sub ApplyExternalLinks( _
+    ByVal targetSheet As Worksheet, _
+    ByVal externalReference As String, _
+    ByVal linkMap As Variant)
+
+    Dim itemIndex As Long
+    Dim targetAddress As String
+    Dim sourceAddress As String
+
+    For itemIndex = LBound(linkMap) To UBound(linkMap)
+
+        targetAddress = CStr(linkMap(itemIndex)(0))
+        sourceAddress = CStr(linkMap(itemIndex)(1))
+
+        targetSheet.Range(targetAddress).FormulaR1C1 = _
+            "=" & externalReference & sourceAddress
+
+    Next itemIndex
+
+End Sub
+
+
+Private Function BuildExternalReference( _
+    ByVal folderPath As String, _
+    ByVal fileName As String, _
+    ByVal sheetName As String) As String
+
+    Dim referenceText As String
+
+    referenceText = _
+        AddTrailingSeparator(folderPath) & _
+        "[" & fileName & "]" & _
+        sheetName
+
+    ' Апострофы внутри пути или названия листа экранируются удвоением.
+    referenceText = Replace(referenceText, "'", "''")
+
+    BuildExternalReference = "'" & referenceText & "'!"
+
+End Function
+
+
+Private Function GetDateToken(ByVal sourceCell As Range) As String
+
+    If IsError(sourceCell.Value) Then
+        Err.Raise _
+            Number:=vbObjectError + 1001, _
+            Source:="GetDateToken", _
+            Description:="Ячейка с датой содержит ошибку."
+    End If
+
+    If IsDate(sourceCell.Value) Then
+        GetDateToken = Format$(CDate(sourceCell.Value), DATE_FILE_FORMAT)
+    Else
+        GetDateToken = Trim$(CStr(sourceCell.Value2))
+    End If
+
+End Function
+
+
+Private Function GetWorksheet( _
+    ByVal workbookObject As Workbook, _
+    ByVal worksheetName As String) As Worksheet
+
+    On Error Resume Next
+    Set GetWorksheet = workbookObject.Worksheets(worksheetName)
+    On Error GoTo 0
+
+    If GetWorksheet Is Nothing Then
+        Err.Raise _
+            Number:=vbObjectError + 1002, _
+            Source:="GetWorksheet", _
+            Description:="В книге """ & workbookObject.Name & _
+                         """ не найден лист """ & worksheetName & """."
+    End If
+
+End Function
+
+
+Private Sub ValidateFileExists(ByVal fullFilePath As String)
+
+    If Len(Dir$(fullFilePath, vbNormal Or vbReadOnly Or vbHidden)) = 0 Then
+        Err.Raise _
+            Number:=vbObjectError + 1003, _
+            Source:="ValidateFileExists", _
+            Description:="Не найден исходный файл:" & _
+                         vbCrLf & fullFilePath
+    End If
+
+End Sub
+
+
+Private Function AddTrailingSeparator(ByVal folderPath As String) As String
+
+    folderPath = Trim$(folderPath)
+
+    If Len(folderPath) = 0 Then
+        Err.Raise _
+            Number:=vbObjectError + 1004, _
+            Source:="AddTrailingSeparator", _
+            Description:="Не указан путь к исходным файлам."
+    End If
+
+    If Right$(folderPath, 1) <> "\" And _
+       Right$(folderPath, 1) <> "/" Then
+
+        folderPath = folderPath & Application.PathSeparator
+
+    End If
+
+    AddTrailingSeparator = folderPath
+
+End Function
